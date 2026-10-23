@@ -1,0 +1,744 @@
+---
+title: "¿Que tipo de empresas optan por la inteligencia artificial?"
+author: "Iker Melero Rodriguez,Pau Romero Cuco"
+date: "23-10-2026"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+  html_document:
+    toc: true
+    df_print: paged
+lang: es
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+      echo = FALSE,     
+      message = FALSE,    
+      warning = FALSE,  
+      fig.pos = "H",     
+      out.extra = ""     
+)
+```
+
+
+
+```{r paquetes}
+# Cargamos paquetes
+library(tidyverse)  
+library(readxl)     
+library(knitr)      
+library(ggthemes)   
+```
+
+
+# Resumen {-}
+
+En el trabajo analizamos la adopcion de la inteligencia artificial (IA) en las empresas españolas a partir del contenido de sus páginas web. Se combinan los indicadores de uso de IA detectados por un modelo de lenguaje en las webs de casi 16.000 empresas en 2023 y 2025 con sus características (tamaño, sector y provincia) procedentes de la base de datos SABI y con su información financiera. El análisis, realizado en R, se organiza en torno a tres preguntas: qué empresas adoptan la IA, cómo ha evolucionado su uso y si se asocia con mejores resultados económicos.
+
+
+Los resultados muestran que el uso de la IA es todavía minoritario, aunque crece rápidamente: el porcentaje de empresas que la muestran en su web pasa del 3,3 % al 4,5 % entre 2023 y 2025. La adopción aumenta con el tamaño de la empresa y se concentra sobre todo en el sector de información y comunicaciones, donde alcanza al 25,8 % de las empresas, y se aplica principalmente en la producción, el marketing y la administración. Su crecimiento es generalizado, pero desigual entre sectores. Sin embargo, no se ha encontrado relación entre el uso de la IA y la productividad: ni la comparación directa entre grupos ni un modelo de regresión que controla el tamaño, el sector y la antigüedad muestran diferencias significativas. Estos resultados sugieren que los beneficios de la IA todavía no se reflejan en los resultados de las empresas, posiblemente por lo reciente de su implantación.
+
+
+# Introducción
+
+La inteligencia artificial ha pasado en pocos años de ser una tecnología reservada a grandes empresas tecnológicas a convertirse en una herramienta para cualquier organización. La aparición de aplicaciones de IA a partir de finales de 2022 ha acelerado este proceso, y hoy en día muchas empresas utilizan asistentes virtuales, herramientas de análisis de datos o sistemas de automatización en tareas como la atención al cliente, el marketing entre otras.
+
+
+Las estadísticas oficiales reflejan este crecimiento. Según Eurostat (2025), el porcentaje de empresas de la Unión Europea con 10 o más empleados que utilizan alguna tecnología de IA pasó del 8,0 % en 2023 al 13,5 % en 2024. En España, el Instituto Nacional de Estadística (INE) sitúa este porcentaje en el 21,1 % en el primer trimestre de 2025, frente al 12,4 % del año anterior, y en el 13,4 % entre las empresas de menos de 10 empleados (INE, 2025). Sin embargo, estos datos proceden de encuestas en las que son las propias empresas las que declaran si usan IA, y ofrecen poca información sobre qué tipo de empresas la adoptan y si su uso se traduce en mejores resultados económicos.
+
+
+Este trabajo aborda la cuestión desde un enfoque diferente: en lugar de preguntar a las empresas, se analiza el contenido de sus páginas web. A partir de una muestra de más de 15.000 empresas españolas, cuyas webs fueron analizadas en 2023 y 2025 mediante un modelo de lenguaje, se identifica qué empresas muestran evidencias de uso de IA y en qué áreas de su actividad. Esta información se combina con las características de cada empresa (tamaño, sector y localización) y con sus datos financieros, lo que permite relacionar la adopción de la IA con el perfil y los resultados de las empresas.
+
+
+El objetivo del trabajo es analizar la adopción de la inteligencia artificial en las empresas españolas a partir de su presencia en la web, respondiendo a tres preguntas:
+
+
+1. ¿Qué empresas adoptan la IA y para qué la utilizan?
+2. ¿Ha aumentado su uso entre 2023 y 2025, y de qué forma?
+3. ¿Se asocia el uso de la IA con mejores resultados empresariales?
+
+A partir de estas preguntas se plantean las siguientes hipótesis:
+
+- *H1:* la adopción de IA es mayor en las empresas de mayor tamaño y en los sectores más intensivos en tecnología y conocimiento.
+- *H2:* el uso de la IA aumenta entre 2023 y 2025, pero de forma desigual entre tamaños y sectores.
+- *H3:* las empresas que utilizan IA presentan una mayor productividad que las que no la utilizan, también al comparar empresas del mismo tamaño y sector.
+
+
+# Metodología
+
+## Datos
+
+Para el análisis se han utilizado cuatro bases de datos facilitadas por el profesorado de la asignatura, que contienen información sobre una muestra de empresas españolas y sus páginas web:
+
+Indicadores de IA 2023 : Evidencias de uso de IA en la web de cada empresa (16.805 webs) 
+Indicadores de IA 2025: Las mismas evidencias, analizadas en 2025 (16.252 webs)
+Muestra empresarial (SABI) : Identificación, sector, tamaño y provincia de cada empresa (20.470 empresas)
+Información financiera : Ventas, empleados, consumos, inmovilizado y fecha de constitución (2022-2023)(8.100 registros)
+
+
+```{r importacion}
+# Importamos los 4 archivos desde la carpeta DATOS del proyecto
+ia_2023    <- read_excel("DATOS/indicadores_ia_web_2023.xlsx")       
+ia_2025    <- read_excel("DATOS/indicadores_ia_web_2025.xlsx")        
+empresas   <- read_excel("DATOS/muestra_empresarial_sabi.xlsx")       
+financiera <- read_excel("DATOS/informacion_financiera.xlsx")
+```
+
+
+## Limpieza de los datos
+
+Antes de unir las bases de datos se revisó cada una de ellas para detectar errores, valores ausentes e inconsistencias. Los principales problemas encontrados y su tratamiento fueron los siguientes:
+
+- *Registros duplicados.* La base financiera contenía 152 filas repetidas exactamente, que se eliminaron. Tras ello quedan 7.948 empresas, cada una con un único registro.
+
+- *Valores no numéricos.* Varias variables financieras y el número de empleados de SABI venían en formato texto porque incluían valores como "n.d.". En el caso de las variables financieras se utilizaron las versiones armonizadas que incluye la base de datos, que contienen la misma información en formato numérico. En el número de empleados, los 1.967 valores no disponibles se transformaron en datos faltantes (NA). Todos ellos corresponden a microempresas, por lo que se trata de faltantes que dependen del tamaño (tipo MAR) y no aleatorios; por este motivo, para comparar por tamaño se utiliza la variable de tamaño de SABI, que está completa.
+
+- *Error en el valor añadido.* La variable de valor añadido de la base original estaba mal calculada: al venir los consumos intermedios con signo negativo, se habían sumado en lugar de restarse, de modo que el valor añadido superaba a las ventas en 7.406 empresas. Se recalculó como la suma de las ventas y los consumos (que ya son negativos).
+
+- *Fechas.* La fecha de constitución estaba almacenada como número de serie de Excel y se convirtió a formato fecha.
+
+- *Categorías inconsistentes.* Algunas provincias aparecían escritas de dos formas distintas (por ejemplo, "CEUTA" y "Ceuta"), que se unificaron, y un valor "0" se sustituyó por un dato faltante. Las categorías de tamaño se tradujeron al castellano y se ordenaron de menor a mayor.
+
+- *Indicadores de IA.* Se eliminaron las columnas de configuración del modelo, que tienen el mismo valor en todas las filas, y se renombraron los indicadores para facilitar su interpretación. Además, se corrigió una incoherencia presente en una web de cada año, que mostraba uso de IA en un área concreta pero no en el indicador general.
+
+
+```{r limpieza_financiera}
+# Eliminamos 152 filas repetidas (misma empresa con los mismos datos)
+financiera_limpia <- financiera |>
+    distinct() |> select(BvD, Gasto_ID_PIB_2023, fecha_constitucion,
+         SALES2022, SALES2023, EMP2022, EMP2023,
+        MAT2022, MAT2023, CAP2022, CAP2023,
+           INNO2022, INNO2023) |>
+  #cambiamos la fecha de constitucion de excel a r
+  mutate(fecha_constitucion = as.Date(as.numeric(fecha_constitucion),
+                                 origin = "1899-12-30"),
+    # Recalculamos el valor añadido, porque estaba mal calculada
+    VA2022 = SALES2022 + MAT2022,
+    VA2023 = SALES2023 + MAT2023
+  )
+```
+
+
+```{r limpieza_empresas}
+# Nos quedamos con las variables que vamos a usar
+empresas_limpia <- empresas |>
+  select(BvD, Empleados, Provincia, Size, NACE_2D, Seccion, Descripcion,
+         URL.REDIRECCIONADAS.2023, URL.REDIRECCIONADAS.2025) |>
+  # Nombres más cortos para las URL, que usaremos para unir las tablas
+  rename(url_2023 = URL.REDIRECCIONADAS.2023,
+         url_2025 = URL.REDIRECCIONADAS.2025) |>
+  #pasamos a NA y Unificamos provincias escritas de dos formas y anulamos el valor "0"
+  mutate(
+    Empleados = as.numeric(Empleados),
+    Provincia = case_when(
+       Provincia == "CEUTA"   ~ "Ceuta",
+        Provincia == "MELILLA" ~ "Melilla",
+         Provincia == "0"       ~ NA,
+           TRUE                   ~ Provincia
+    ),
+    # orden de tamaño de pequeño a mayor, despues pasamos a castellano
+    Size = factor(Size,
+                  levels = c("Micro", "Small", "Medium", "Large"),
+                  labels = c("Micro", "Pequeña", "Mediana", "Grande"))
+  )
+```
+
+
+```{r limpieza_ia}
+ia_limpia <- bind_rows(ia_2023, ia_2025) |>
+  # renombramos las variables menos explicativas y ponemos nombres comprensibles a los indicadores
+  select(anyo, url,
+         usa_ia            = respuesta_IAIA1,
+         ia_interna        = respuesta_IAIA2,
+         ia_produccion     = respuesta_IAPGS,
+         ia_logistica      = respuesta_IADL,
+         ia_marketing      = respuesta_IAMS,
+         ia_sistemas       = respuesta_IAICS,
+         ia_administracion = respuesta_IAAM,
+         ia_desarrollo     = respuesta_IAPDB,
+         ia_producto       = respuesta_IAIA4,
+         ia_radical        = respuesta_IAIA5) |>
+  # creamos columna con numero de areas totales de la empresa en la que usa IA
+  mutate(
+    n_areas = ia_produccion + ia_logistica + ia_marketing + ia_sistemas + ia_administracion + ia_desarrollo,
+    # Corregimos la incoherencia: si usa IA en algún área, usa IA
+    usa_ia = if_else(n_areas > 0, 1, usa_ia)
+  )
+```
+
+
+## Unión de las bases de datos
+Para unir los indicadores de IA con las empresas se utilizó la dirección web de cada año. Durante este proceso se detectó que unas 4.400 empresas por año comparten su página web con otras empresas, en su mayoría franquicias o filiales que utilizan la web de la marca (por ejemplo, 31 empresas comparten la web de McDonald's). Como el indicador de IA mide el contenido de la web y no la decisión de cada empresa, se compararon dos criterios:El primero, conservar una sola empresa por web y segundo, excluir las webs compartidas. Se eligió la segunda opción, ya que la primera obliga a elegir de forma arbitraria qué empresa se queda con la web y puede asignar empresas distintas a una misma web en cada año. Los porcentajes de adopción apenas varían entre ambos criterios (3,4 % frente a 3,3 % en 2023 y 4,7 % frente a 4,5 % en 2025), por lo que la decisión no altera las conclusiones.
+
+
+A continuación se añadieron a cada empresa sus características de SABI y su información financiera mediante el código BvD, conservando todas las empresas aunque no dispusieran de datos financieros. El resultado es una tabla con 29.824 observaciones (una por empresa y año), correspondientes a 15.949 empresas distintas, de las cuales 13.875 están presentes en los dos años. Solo el 41 % de las observaciones dispone de información financiera, y su disponibilidad depende del tamaño: alrededor del 25 % de las microempresas frente al 70-80 % del resto. Por este motivo, el análisis de los resultados económicos se realiza sobre la submuestra de empresas con datos financieros y controlando por tamaño.
+
+
+```{r union_ia}
+# Pasamos las empresas a formato largo: una fila por empresa y año con su web
+webs_empresa <- empresas_limpia |>
+  select(BvD, url_2023, url_2025) |>
+  pivot_longer(
+    cols = c(url_2023, url_2025),    
+    names_to = "anyo",              
+    values_to = "url"                
+  ) |>
+ # Quitamos "url_" para que quede 2023 o 2025 y lo pasamos a número,para que coincida con
+ # la columna anyo de ia_limpia
+  mutate(anyo = as.numeric(str_remove(anyo, "url_")))
+
+# OPCIÓN 1 (descartada): nos quedamos con una sola empresa por web
+ia_empresas_op1 <- webs_empresa |>
+  distinct(anyo, url, .keep_all = TRUE) |>       
+  inner_join(ia_limpia, by = c("anyo", "url"))   
+
+# OPCIÓN 2 (elegida): solo empresas que tienen una web propia
+ia_empresas <- webs_empresa |>
+  group_by(anyo, url) |>          
+  filter(n() == 1) |>             
+  ungroup() |>                    
+  inner_join(ia_limpia, by = c("anyo", "url"))  
+```
+
+
+```{r union_completa}
+datos <- ia_empresas |>
+  # Añadimos sector, tamaño y provincia de cada empresa (quitamos las URL porque ya tenemos la columna url de cada año) y tambien añadimos infomacion financiera
+  left_join(empresas_limpia |> select(-url_2023, -url_2025), by = "BvD") |>
+  left_join(financiera_limpia, by = "BvD")
+```
+
+## Variables de análisis
+
+A partir de los datos unidos se crearon las siguientes variables:
+
+- *Uso de IA:* variable binaria que toma el valor 1 si la web muestra evidencias de uso de IA.
+
+- *Intensidad de uso:* número de áreas de la empresa (de 0 a 6) en las que se usa IA.
+
+- *Productividad:* valor añadido por empleado en 2023, en miles de euros. Se ha preferido al indicador de ventas por empleado porque las ventas dependen mucho del sector (por ejemplo, una empresa de distribución factura mucho pero compra casi todo lo que vende), mientras que el valor añadido mide la riqueza que genera realmente la empresa.
+
+- *Crecimiento de las ventas:* variación porcentual de las ventas entre 2022 y 2023.
+
+- *Antigüedad:* años transcurridos desde la constitución de la empresa hasta 2023.
+
+
+```{r variables_nuevas}
+datos <- datos |>
+  mutate(
+    grupo_ia = factor(usa_ia, levels = c(0, 1), labels = c("Sin IA", "Con IA")),
+    productividad = VA2023 / EMP2023,
+    crec_ventas = 100 * (SALES2023 - SALES2022) / SALES2022,
+    antiguedad = 2023 - year(fecha_constitucion)
+  )
+```
+
+# Resultados
+
+```{r funciones}
+# Función para resumir la adopción de IA de un grupo de empresas.
+resumir_ia <- function(datos) {
+  datos |>
+    summarise(
+      empresas = n(),
+      con_ia = sum(usa_ia),
+      pct_ia = 100 * mean(usa_ia),
+      .groups = "drop"
+    )}
+
+
+# Para describir el perfil actual usamos el año más reciente
+datos_2025 <- datos |> filter(anyo == 2025)
+```
+
+
+
+## ¿Qué empresas adoptan IA?
+
+### Adopción de IA según el tamaño de la empresa
+
+```{r tabla_tamano}
+# % de empresas con IA según su tamaño (2025)
+ia_tamano <- datos_2025 |>
+  group_by(Size) |>      
+  resumir_ia()          
+
+# Mostramos la tabla con formato en el PDF
+kable(ia_tamano,
+      digits = 1,     
+      col.names = c("Tamaño", "Empresas", "Con IA", "% con IA"),
+      caption = "Adopción de IA según el tamaño de la empresa (2025)")
+```
+
+Como podemos observar en la (Tabla 1) la adopción de la IA aumenta claramente con el tamaño de la empresa. En 2025,en el 3,5% de las microempresas se utiliza la IA en su web, frente al 6,0% de las pequeñas y el 9,0% de las medianas. Nos muestra que una empresa mediana tiene 3 veces mas probabilidad de usar IA que una microempresa.
+
+
+Un factor que tenemos que tener en cuenta cuando analizamos el dato de las empresas grandes(11,8%), es que en la muestra solo hay 17 empresas grandes con web propia.
+
+
+Dicho dato refuerza la teoria de cuando las empresas tienen mas recursos y personal suelen incorporar antes esta tecnologia. 
+
+### Adopcion de la IA segun el sector de las empresas
+
+```{r tabla_sector}
+# Nombres cortos en castellano para cada sección de actividad 
+nombres_sector <- tribble(
+  ~Seccion, ~sector,
+  "A", "Agricultura y pesca",
+  "B", "Industrias extractivas",
+  "C", "Industria manufacturera",
+  "D", "Energía",
+  "E", "Agua y residuos",
+  "F", "Construcción",
+  "G", "Comercio",
+  "H", "Transporte",
+  "I", "Hostelería",
+  "J", "Información y comunicaciones",
+  "K", "Finanzas y seguros",
+  "L", "Inmobiliarias",
+  "M", "Act. profesionales y técnicas",
+  "N", "Servicios administrativos",
+  "O", "Administración pública",
+  "P", "Educación",
+  "Q", "Sanidad y servicios sociales",
+  "R", "Ocio y cultura",
+  "S", "Otros servicios",
+  "T", "Hogares",
+  "U", "Organismos extraterritoriales"
+)
+
+ia_sector <- datos_2025 |>
+  left_join(nombres_sector, by = "Seccion") |>         
+  group_by(sector) |>                                  
+  resumir_ia() |>                                      
+  # Quitamos sectores con menos de 50 empresas: su porcentaje no es fiable
+  filter(empresas >= 50)
+```
+
+
+```{r grafico_sector, fig.height = 4.5, fig.width = 7, fig.cap = "Porcentaje de empresas con IA por sector de actividad (2025)"}
+# Gráfico de barras: % de empresas con IA por sector
+ggplot(ia_sector, aes(x = reorder(sector, pct_ia), y = pct_ia)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = round(pct_ia, 1)), hjust = -0.2, size = 3) +
+  coord_flip() +
+   expand_limits(y = 30) +
+  labs(
+    x = NULL,
+    y = "% de empresas con IA"
+  ) +
+  theme_economist()
+
+
+
+```
+El sector de actividad es el factor que marca más diferencias en el uso de la IA (Figura 1).
+
+Información y comunicaciones destaca muy por encima del resto: una de cada cuatro empresas (25,8 %) muestra evidencias de IA en su web, más del triple que el siguiente sector. Le siguen, a bastante distancia, las actividades profesionales y técnicas y la educación (7,9 % en ambos casos) y las finanzas y seguros (5,3 %), es decir, sectores intensivos en conocimiento y en el manejo de información.
+
+En el extremo opuesto se sitúan los sectores más tradicionales o con mayor peso de la actividad física, como la construcción (1,7 %), la hostelería (1,1 %) o el ocio y la cultura (0,5 %). Este resultado apoya la primera hipótesis: la IA se concentra en los sectores tecnológicos y de servicios avanzados, donde su aplicación es más directa. 
+
+### Adopcion de la IA segun las areas dentro de la misma empresa
+
+```{r grafico_areas, fig.height = 3.5, fig.width = 7, fig.cap = "Áreas de la empresa en las que se usa IA (empresas con IA, 2025)"}
+ia_areas <- datos_2025 |>
+  filter(usa_ia == 1) |>
+  pivot_longer(
+    cols = c(ia_produccion, ia_logistica, ia_marketing,
+             ia_sistemas, ia_administracion, ia_desarrollo),
+    names_to = "area",
+    values_to = "usa_area"
+  ) |>
+  group_by(area) |>
+  summarise(pct = 100 * mean(usa_area), .groups = "drop") |>
+  mutate(area = case_when(
+    area == "ia_produccion"     ~ "Producción",
+    area == "ia_logistica"      ~ "Distribución y logística",
+    area == "ia_marketing"      ~ "Marketing y ventas",
+    area == "ia_sistemas"       ~ "Sistemas de información",
+    area == "ia_administracion" ~ "Administración y gestión",
+    area == "ia_desarrollo"     ~ "Desarrollo de productos"
+  ))
+
+ggplot(ia_areas, aes(x = reorder(area, pct), y = pct)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = round(pct, 1)), hjust = -0.2, size = 3) +
+  coord_flip() +
+  expand_limits(y = 45) +
+  labs(
+    x = NULL,
+    y = "% de empresas con IA que la usan en cada área"
+  ) +
+  theme_economist()
+```
+
+
+En cuanto al uso que las empresas hacen de la IA (Figura 2), las áreas más habituales son la produccion de bienes o servicios (37,5 % de las empresas con IA), el marketing y las ventas (35,9 %) y la administración y gestión (34,0 %), seguidas del desarrollo de productos (29,3 %) y los sistemas de información (25,8 %).
+
+En cambio, su uso en distribución y logística es muy poco frecuente (9,4 %). Es decir, la IA se emplea sobre todo en tareas relacionadas con la atención al cliente, la comunicación y la gestión interna, donde herramientas como los asistentes virtuales o la automatización de documentos son fáciles de aplicar. Además, la mayoría de las empresas que usan IA la aplican en pocas áreas: de media, en 1,7 de las 6 analizadas, lo que indica que su implantación es todavía parcial.
+
+
+De las empresas con IA, el 67 % vende un producto o servicio basado en IA (ia_producto), y 148 de ellas no la usan en ninguna de las 6 áreas internas. Eso indica que muchas de las empresas “con IA” son proveedoras de IA (consultoras, empresas de software...), no solo usuarias. Encaja con que Información y comunicaciones sea el sector que más destaca.
+
+
+
+## Evolución entre 2023 y 2025
+
+```{r tabla_evolucion_tamano}
+evol_tamano <- datos |>
+  # % de empresas con IA por tamaño y año (usamos nuestra función)
+  group_by(Size, anyo) |>
+  resumir_ia() |>
+  select(Size, anyo, pct_ia) |>
+  pivot_wider(
+    names_from = anyo,
+    values_from = pct_ia,
+    names_prefix = "pct_"
+  ) |>
+  # Variación relativa entre los dos años (en %)
+  mutate(variacion = 100 * (pct_2025 - pct_2023) / pct_2023)
+
+kable(evol_tamano,
+      digits = 1,
+      col.names = c("Tamaño", "% con IA 2023", "% con IA 2025", "Variación (%)"),
+      caption = "Evolución de la adopción de IA según el tamaño de la empresa")
+```
+
+Entre 2023 y 2025 la proporción de empresas con IA pasa del 3,3 % al 4,5 %, lo que supone un crecimiento del 37 % en solo dos años. Como se observa en la Tabla 2, este aumento se produce en las micro, pequeñas y medianas empresas, aunque con distinta intensidad. En términos relativos, el mayor crecimiento corresponde a las microempresas (+46 %), seguidas de las pequeñas (+30 %) y las medianas (+15 %). Es decir, las empresas que partían de niveles más bajos son las que más avanzan, lo que sugiere que la IA empieza a llegar a las empresas pequeñas, posiblemente gracias a herramientas más baratas y sencillas. Aun así, la brecha en niveles se mantiene: en 2025 una empresa mediana sigue teniendo más del doble de probabilidad de usar IA que una microempresa. El ligero descenso en las grandes empresas no es significativo, ya que en la muestra solo hay 16 y 17 empresas grandes.
+
+
+```{r grafico_evolucion_sector, fig.height = 6, fig.width = 7, fig.cap = "Evolución del porcentaje de empresas con IA por sector (2023-2025)"}
+evol_sector <- datos |>
+  # Añadimos el nombre del sector en castellano (tabla creada en tabla_sector)
+  left_join(nombres_sector, by = "Seccion") |>
+  group_by(sector, anyo) |>
+  resumir_ia() |>
+  # Mismo criterio que en la Figura 1: sectores con al menos 50 empresas
+  filter(empresas >= 50)
+
+ggplot(evol_sector, aes(x = factor(anyo), y = pct_ia, group = sector)) +
+  geom_line() + geom_point(size = 2) + geom_text(aes(label = round(pct_ia, 1)), 
+  vjust = -0.8, size = 2.5) +
+  facet_wrap(~ sector) +
+  labs(
+    x = "Año",
+    y = "% de empresas con IA"
+  ) +
+  theme_economist()
+```
+
+La Figura 3 muestra cómo ha cambiado el porcentaje de empresas con IA en cada sector entre 2023 y 2025. 
+
+En casi todos los sectores En casi todos los paneles la línea es ascendente, lo que confirma que el crecimiento de la IA es generalizado, lo que confirma que el crecimiento de la IA es generalizado. 
+
+Sin embargo, la intensidad es muy desigual. En términos absolutos, el mayor avance se produce en información y comunicaciones, que ya era el sector líder y gana casi 6 puntos (del 20,0 % al 25,8 %), lo que amplía todavía más su distancia con el resto. En términos relativos destacan la educación, que duplica su porcentaje (del 3,9 % al 7,9 %), y el transporte, que pasa del 0,6 % al 2,5 %, aunque partiendo de niveles muy bajos. 
+
+En el extremo contrario, sectores tradicionales como la construcción, la hostelería o el comercio apenas avanzan (menos de un punto), y el ocio y la cultura incluso retrocede ligeramente. Por tanto, se confirma la segunda hipótesis: la adopción de la IA crece, pero de forma desigual, y la brecha entre los sectores tecnológicos y los tradicionales tiende a ampliarse.
+
+
+
+```{r tabla_transiciones}
+transiciones <- datos |>
+  select(BvD, anyo, usa_ia) |>
+  pivot_wider(
+    names_from = anyo,
+    values_from = usa_ia,
+    names_prefix = "ia_"
+  ) |>
+  filter(!is.na(ia_2023), !is.na(ia_2025)) |>
+  # Clasificamos cada empresa según cómo ha cambiado
+  mutate(situacion = case_when(
+    ia_2023 == 0 & ia_2025 == 0 ~ "No usa IA en ningún año",
+    ia_2023 == 0 & ia_2025 == 1 ~ "Empieza a usar IA",
+    ia_2023 == 1 & ia_2025 == 1 ~ "Mantiene la IA",
+    ia_2023 == 1 & ia_2025 == 0 ~ "Deja de usar IA"
+  )) |>
+  count(situacion) |>
+  mutate(porcentaje = 100 * n / sum(n)) |>
+  arrange(desc(n))
+
+kable(transiciones,
+      digits = 1,
+      col.names = c("Situación", "Empresas", "%"),
+      caption = "Cambios en el uso de IA de las empresas presentes en 2023 y 2025")
+```
+
+Al seguir a las 13.875 empresas presentes en ambos años (Tabla 3), se observa que la gran mayoría (94,4 %) no muestra evidencias de IA en ninguno de los dos momentos. Entre 2023 y 2025, 319 empresas empiezan a usar IA, mientras que 158 dejan de mostrarla en su web, por lo que el saldo neto es positivo (161 empresas más).
+
+De las empresas que ya usaban IA en 2023, dos de cada tres (66 %) la mantienen en 2025, lo que indica que, una vez incorporada, la IA tiende a consolidarse. Sin embargo, el número de abandonos no es despreciable. 
+
+Una posible explicación es que el indicador se basa en el contenido de la web: una empresa puede rediseñar su página o dejar de mencionar la IA sin haber dejado de utilizarla. 
+
+Por ello, estos movimientos deben interpretarse con cautela, y la cifra más fiable es el saldo neto, que confirma que el uso de la IA crece.
+
+
+## IA y resultados empresariales
+
+```{r datos_resultados}
+# Para la pregunta 3 usamos solo las empresas con información financiera y tomamos el uso de IA de 2023, el mismo año que las cuentas.
+
+datos_fin <- datos |>
+    filter(anyo == 2023, !is.na(productividad))
+```
+
+
+```{r tabla_descriptivos}
+descriptivos <- datos_fin |>
+  select(productividad, crec_ventas, antiguedad, EMP2023) |>
+  pivot_longer(
+      cols = c(productividad, crec_ventas, antiguedad, EMP2023),
+       names_to = "variable",
+      values_to = "valor"
+  ) |>
+  group_by(variable) |>
+  summarise(
+    n = sum(!is.na(valor)),
+    media = mean(valor, na.rm = TRUE),
+    mediana = median(valor, na.rm = TRUE),
+    desv_tipica = sd(valor, na.rm = TRUE),
+    minimo = min(valor, na.rm = TRUE),
+    maximo = max(valor, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  # Nombres comprensibles para la tabla
+  mutate(variable = case_when(
+    variable == "productividad" ~ "Productividad (miles €/empleado)",
+    variable == "crec_ventas"   ~ "Crecimiento de ventas 2022-23 (%)",
+    variable == "antiguedad"    ~ "Antigüedad (años)",
+    variable == "EMP2023"       ~ "Empleados 2023"
+  ))
+
+kable(descriptivos,
+      digits = 1,
+      col.names = c("Variable", "N", "Media", "Mediana", "Desv. típica", "Mínimo", "Máximo"),
+      caption = "Estadísticos descriptivos de las empresas con datos financieros (2023)")
+```
+
+Para analizar la relación entre el uso de IA y los resultados se utilizan las 5.684 empresas que disponen de información financiera en 2023, de las cuales 226 usan IA. 
+La Tabla 4 muestra que se trata de empresas de tamaño reducido (mediana de 13 empleados) y con una antigüedad media de 24 años. Las variables económicas presentan una fuerte asimetría: en la productividad, la media (51,4 miles de euros por empleado) es claramente superior a la mediana (44,0), y la desviación típica es muy elevada en relación con la media. 
+El caso del crecimiento de las ventas es aún más extremo: la mediana es del 6,6 %, pero existen empresas que multiplican sus ventas por más de 70.
+
+```{r histograma_productividad, fig.height = 3.5, fig.width = 7, fig.cap = "Distribución de la productividad (valor añadido por empleado, 2023)"}
+# Histograma: cuántas empresas hay en cada tramo de productividad
+ggplot(datos_fin, aes(x = productividad)) +
+  geom_histogram(binwidth = 5, fill = "steelblue") +   # cada barra = un tramo de 5 mil euros por empleado
+  coord_cartesian(xlim = c(-50, 200)) +                # zoom en la zona donde están casi todas las empresas
+                                                       # (no elimina datos: los extremos siguen en el cálculo)
+  labs(
+    x = "Productividad (miles de euros por empleado)",
+    y = "Número de empresas"
+  ) +
+  theme_economist()
+```
+
+El histograma de la productividad (Figura 4) confirma esta asimetría. Para que la forma de la distribución pueda apreciarse, el gráfico muestra el tramo entre −50 y 200 miles de euros por empleado, que incluye al 98,9 % de las empresas.
+
+La mayoría se concentra entre 25 y 75 miles de euros por empleado (el 76 % de la muestra) y la distribución presenta una cola larga hacia la derecha, formada por unas pocas empresas muy productivas. 
+
+Además, existen algunos valores extremos que quedan fuera del gráfico, tanto muy elevados (hasta 2.605) como negativos (hasta −929), que corresponden a empresas con valor añadido negativo, es decir, que consumen más de lo que venden. Por este motivo, en los análisis siguientes se emplea la mediana, que no se ve afectada por los valores extremos, y se revisan los valores atípicos antes de comparar grupos.
+
+### Valores atípicos en la productividad
+
+```{r atipicos}
+# Función del profesor para marcar valores atípicos con la regla IQR
+
+marcar_atipicos <- function(x) {
+  q1 <- quantile(x, 0.25, na.rm = TRUE)          
+  q3 <- quantile(x, 0.75, na.rm = TRUE)          
+  iqr_x <- q3 - q1                               
+  x < q1 - 1.5 * iqr_x | x > q3 + 1.5 * iqr_x    
+}
+
+# Marcamos las empresas con productividad atípica
+datos_fin <- datos_fin |>
+  mutate(es_atipico = marcar_atipicos(productividad))
+
+# Cuántos atípicos hay en cada grupo (con IA y sin IA)
+tabla_atipicos <- datos_fin |>
+  group_by(grupo_ia) |>                            
+  summarise(
+    empresas = n(),                               
+    atipicos = sum(es_atipico),                    
+    pct_atipicos = 100 * mean(es_atipico),         
+    .groups = "drop"
+  )
+
+# Mostramos la tabla con formato
+kable(tabla_atipicos,
+      digits = 1,
+      col.names = c("Grupo", "Empresas", "Atípicas", "% atípicas"),
+      caption = "Empresas con productividad atípica según el uso de IA (regla IQR, 2023)")
+
+# Base para comparar grupos: quitamos las empresas atípicas
+datos_fin_sin_atip <- datos_fin |>
+  filter(!es_atipico)
+```
+
+
+Para evitar que los valores extremos distorsionen la comparación entre grupos, se han identificado los valores atípicos de la productividad mediante la regla del rango intercuartílico.
+
+Con un primer cuartil de 32,7 y un tercer cuartil de 60,4 miles de euros por empleado, se consideran atípicas las empresas por debajo de −8,8 o por encima de 102,0, lo que supone 391 empresas (el 6,9 % de la muestra). Siguiendo el criterio de marcar antes de eliminar, estas empresas no se han borrado de los datos, sino que se han identificado y revisado. 
+
+Como no se trata de errores sino de casos reales (empresas con pérdidas o muy productivas), se mantienen en la descripción general, pero se excluyen al comparar las empresas con y sin IA. La Tabla 5 muestra que la proporción de atípicos es similar en ambos grupos (6,8 % y 8,0 %), por lo que su exclusión no favorece a ninguno de ellos. Las decisiones tomadas se resumen en el siguiente registro:
+
+
+### Productividad de las empresas con y sin IA
+
+
+```{r boxplot_productividad, fig.height = 3.5, fig.width = 6, fig.cap = "Productividad de las empresas con y sin IA (2023, sin valores atípicos)"}
+# Diagrama de caja: distribución de la productividad en cada grupo
+# (mismo esquema que el boxplot de la diapositiva 36 de Transformación)
+ggplot(datos_fin_sin_atip,
+       aes(x = grupo_ia, y = productividad, fill = grupo_ia)) + geom_boxplot() +labs(
+    x = "Uso de IA en la web",
+    y = "Productividad (miles de euros por empleado)"
+  ) + theme_economist() + theme(legend.position = "none")                                
+```
+
+La Figura 5 compara la distribución de la productividad entre las empresas que usan IA y las que no, una vez excluidos los valores atípicos. Las dos cajas son muy similares: la mediana de las empresas con IA (43,5 miles de euros por empleado) es apenas 0,7 puntos superior a la de las empresas sin IA (42,8), y el 50 % central de las empresas se sitúa en rangos parecidos en ambos grupos (entre 30,5 y 60,0 con IA, y entre 32,5 y 56,5 sin IA). 
+
+La única diferencia apreciable es que la caja de las empresas con IA es algo más amplia, es decir, su productividad es más variable: entre ellas hay tanto empresas muy productivas como otras por debajo de la media. Visualmente, por tanto, no se aprecia que usar IA vaya acompañado de una productividad claramente mayor. Para comprobar si la pequeña diferencia observada es real o se debe al azar aplicaremos un contraste de hipótesis.
+
+
+### Contraste de la diferencia de productividad
+
+```{r test_t}
+# Test t: ¿es distinta la productividad media de las empresas con y sin IA?
+# H0: las medias son iguales / H1: las medias son distintas
+resultado_t <- t.test(productividad ~ grupo_ia, data = datos_fin_sin_atip)
+
+# Guardamos los resultados que nos interesan en una tabla pequeña
+tabla_t <- tibble(
+  media_sin_ia = resultado_t$estimate[1],                           
+  media_con_ia = resultado_t$estimate[2],                           
+  diferencia   = resultado_t$estimate[2] - resultado_t$estimate[1], 
+  p_valor      = resultado_t$p.value                                
+)
+
+# Mostramos la tabla con formato
+kable(tabla_t,
+      digits = 3,
+      col.names = c("Media sin IA", "Media con IA", "Diferencia", "p-valor"),
+      caption = "Test t de diferencia de medias de la productividad (2023, sin atípicos)")
+```
+
+Para comprobar si la pequeña diferencia observada en la Figura 5 es estadísticamente significativa, se ha aplicado un contraste t de diferencia de medias (en su versión de Welch, que no requiere que ambos grupos tengan la misma varianza, dado que su tamaño y dispersión son muy distintos).
+
+La hipótesis nula es que la productividad media de las empresas con y sin IA es la misma. Como muestra la Tabla 6, la productividad media de las empresas con IA es de 46,8 miles de euros por empleado frente a 45,6 en las empresas sin IA, una diferencia de solo 1,2 miles de euros. 
+
+El p-valor obtenido (0,455) es muy superior al nivel de significación habitual del 5 %, por lo que no hay evidencia suficiente para rechazar la hipótesis nula: la diferencia de productividad entre ambos grupos no es estadísticamente significativa y podría deberse al azar.
+
+
+
+### Efecto de la IA a igual tamaño, sector y antigüedad
+
+```{r regresion}
+# Datos para el modelo: el logaritmo solo existe para valores positivos, así que quitamos las empresas con productividad negativa o cero
+datos_modelo <- datos_fin |>
+  filter(productividad > 0)
+
+# Regresión lineal múltiple:
+# log(productividad) en función del uso de IA, controlando tamaño, antigüedad y sector
+modelo <- lm(log(productividad) ~ grupo_ia + Size + antiguedad + Seccion,
+             data = datos_modelo)
+
+# Sacamos los coeficientes y sus intervalos de confianza al 95 %
+coef_matriz <- summary(modelo)$coefficients   
+ic <- confint(modelo)                         
+
+# Tabla de resultados (mismo formato que la "tabla alternativa" del documento de regresión)
+tabla_reg <- tibble(
+  variable   = rownames(coef_matriz),            
+  estimacion = coef_matriz[, "Estimate"],        
+  error      = coef_matriz[, "Std. Error"],     
+  ic_inf     = ic[, 1],                        
+  ic_sup     = ic[, 2],                          
+  p_valor    = coef_matriz[, "Pr(>|t|)"]         
+) |>
+  
+  filter(!str_detect(variable, "Seccion")) |>
+  mutate(variable = case_when(
+    variable == "(Intercept)"    ~ "Constante",
+    variable == "grupo_iaCon IA" ~ "Usa IA (ref.: sin IA)",
+    variable == "SizePequeña"    ~ "Pequeña (ref.: micro)",
+    variable == "SizeMediana"    ~ "Mediana (ref.: micro)",
+    variable == "SizeGrande"     ~ "Grande (ref.: micro)",
+    variable == "antiguedad"     ~ "Antigüedad (años)"
+  ))
+
+# Mostramos la tabla con formato
+kable(tabla_reg,
+      digits = 3,
+      col.names = c("Variable", "Estimación", "Error est.", "IC 95% inf.", "IC 95% sup.", "p-valor"),
+      caption = "Regresión lineal del logaritmo de la productividad (2023, controlando por sector)")
+```
+
+Para comprobar si la ausencia de diferencias se mantiene al comparar empresas similares, se ha estimado un modelo de regresión lineal múltiple en el que la variable dependiente es el logaritmo de la productividad. Se utiliza el logaritmo para reducir la fuerte asimetría de la variable, lo que obliga a excluir las 78 empresas con productividad negativa o nula (quedan 5.606). Como variables explicativas se incluyen el uso de IA, el tamaño, la antigüedad y el sector de actividad; estos tres últimos actúan como variables de control, de modo que el efecto de la IA se interpreta como la diferencia entre empresas del mismo tamaño, sector y antigüedad.
+
+Los resultados (Tabla 7) confirman lo observado anteriormente: el coeficiente del uso de IA es prácticamente nulo (−0,001) y no es estadísticamente significativo (p-valor = 0,977), con un intervalo de confianza que incluye el cero. Por tanto, a igualdad de tamaño, sector y antigüedad, las empresas que muestran IA en su web no presentan una productividad distinta. La única variable significativa (además del sector, cuyos coeficientes no se muestran) es la antigüedad: cada año adicional se asocia con una productividad un 0,3 % mayor ,lo que puede reflejar la experiencia acumulada. El R² del modelo es bajo (3,6 %), lo que indica que la productividad depende en gran medida de factores no incluidos en los datos. Con todo ello, la tercera hipótesis no se confirma. Hay que recordar, además, que este análisis muestra asociaciones y no relaciones causales, y que la IA se mide a partir del contenido de la web, que no refleja necesariamente su uso real en la actividad de la empresa.
+
+
+### Comprobación de las asunciones del modelo
+
+```{r diagnostico_modelo, fig.height = 5, fig.width = 7, fig.cap = "Gráficos de diagnóstico de las asunciones del modelo de regresión"}
+# Gráficos de diagnóstico de la regresión (UD 2.2 - Diagnóstico de asunciones)
+par(mfrow = c(2, 2))   
+plot(modelo)           
+                      
+par(mfrow = c(1, 1))   
+
+# Distancia de Cook máxima: indica si hay alguna empresa con demasiada influencia
+max(cooks.distance(modelo))
+
+# Comprobación de robustez: repetimos el modelo sin los valores atípicos
+modelo_sin_atip <- lm(log(productividad) ~ grupo_ia + Size + antiguedad + Seccion,
+                      data = datos_modelo |> filter(!es_atipico))
+```
+
+Siguiendo la estrategia de modelización, se han comprobado las asunciones del modelo (Figura 6). El gráfico de residuos frente a valores ajustados no muestra ningún patrón claro, por lo que la relación puede considerarse lineal, aunque la dispersión de los residuos no es del todo constante (heterocedasticidad moderada).
+
+El gráfico Q-Q indica que los residuos se ajustan bien a una distribución normal en la zona central, pero se alejan de ella en los extremos. No hay problemas de multicolinealidad, ya que casi todas las variables explicativas son categóricas y poco relacionadas entre sí, y la independencia de las observaciones está garantizada por el diseño, ya que cada empresa aparece una sola vez. Tampoco existen observaciones influyentes: la distancia de Cook máxima es de 0,087, muy inferior al valor de referencia de 0,5.
+
+Para corregir la asimetría ya se ha aplicado la transformación logarítmica. La conclusión sobre la IA es robusta: al repetir el modelo excluyendo los valores atípicos, su coeficiente sigue siendo prácticamente nulo (−0,019) y no significativo (p-valor = 0,566)
+
+
+# Conclusiones
+
+En conclusion hemos analizado la adopción de la inteligencia artificial en una muestra de casi 16.000 empresas españolas a partir del contenido de sus páginas web en 2023 y 2025, relacionándola con su tamaño, su sector y sus resultados económicos. Las principales conclusiones son las siguientes.
+
+En primer lugar, el uso de la IA está muy concentrado en determinados tipos de empresa, lo que confirma la primera hipótesis. La adopción aumenta con el tamaño: en 2025 la utiliza el 3,5 % de las microempresas frente al 9,0 % de las medianas. Pero el factor que más diferencias marca es el sector: en información y comunicaciones una de cada cuatro empresas muestra IA en su web, mientras que en sectores como la hostelería o la construcción apenas llega al 1-2 %. Estos resultados coinciden con las estadísticas oficiales, que también muestran una adopción mucho mayor en las grandes empresas (41,1 % frente al 11,2 % de las pequeñas en la Unión Europea en 2024, según datos de Eurostat) y en el sector servicios (INE, 2025). En cuanto a su uso, la IA se aplica sobre todo en la producción, el marketing y la administración, y casi nunca en la logística, y la mayoría de las empresas la utilizan en pocas áreas, lo que indica que su implantación es todavía parcial.
+
+En segundo lugar, la adopción de la IA crece de forma rápida pero desigual, lo que confirma la segunda hipótesis. El porcentaje de empresas con IA pasa del 3,3 % al 4,5 % entre 2023 y 2025, un aumento del 37 %, y el saldo entre las empresas que empiezan a usarla y las que dejan de mostrarla es claramente positivo. En términos relativos, las microempresas son las que más crecen, lo que sugiere que la IA empieza a llegar a las empresas pequeñas. Sin embargo, por sectores la brecha se amplía, ya que el sector líder, información y comunicaciones, es el que más avanza en términos absolutos. Este crecimiento va en la misma línea que el observado por el INE (2025) y Eurostat (2025), aunque los niveles que obtenemos son mucho más bajos.
+
+En tercer lugar, no se ha encontrado relación entre el uso de la IA y la productividad, por lo que la tercera hipótesis no se confirma. La productividad de las empresas con y sin IA es prácticamente igual, tanto en la comparación directa (contraste t, p-valor = 0,455) como al comparar empresas del mismo tamaño, sector y antigüedad mediante una regresión (p-valor = 0,977). Este resultado es coherente con la llamada "paradoja de la productividad" de la IA descrita por Brynjolfsson, Rock y Syverson (2019), según la cual los beneficios de las nuevas tecnologías tardan en reflejarse en la productividad, porque requieren inversiones complementarias como la formación de los trabajadores o cambios en la organización. Dado que la adopción de la IA es muy reciente, es posible que sus efectos todavía no se aprecien en los datos de 2023.
+
+El estudio presenta varias limitaciones. La principal es que la IA se mide a partir del contenido de la web, lo que solo recoge el uso que la empresa muestra públicamente; esto explica que nuestros porcentajes sean muy inferiores al 21,1 % que obtiene el INE mediante encuestas, y que una parte de las empresas parezca dejar de usar la IA cuando probablemente solo ha cambiado su página web. Además, la clasificación la realiza un modelo de lenguaje, que puede cometer errores. Por otra parte, se han excluido las empresas que comparten web con otras, como las franquicias, y la información financiera solo está disponible para el 41 % de las observaciones, con una presencia menor de microempresas. Por último, los resultados muestran asociaciones y no relaciones causales.
+
+Como analisis a futuro, sería interesante repetir el análisis con los datos financieros de años posteriores para comprobar si los efectos de la IA sobre la productividad aparecen con el tiempo, así como combinar la información de las webs con encuestas a las propias empresas. También sería útil distinguir entre las empresas que usan la IA y las que la venden, ya que dos de cada tres empresas con IA ofrecen productos basados en esta tecnología.
+
+En resumen, los resultados muestran que la inteligencia artificial está entrando en las empresas españolas, pero de forma todavía minoritaria, concentrada en las empresas más grandes y en los sectores tecnológicos, y sin que, por el momento, se traduzca en una mayor productividad.
+
+
+
+# Bibliografía
+
+Brynjolfsson, E., Rock, D. y Syverson, C. (2019). Artificial intelligence and the modern productivity paradox: A clash of expectations and statistics. En A. Agrawal, J. Gans y A. Goldfarb (Eds.), *The Economics of Artificial Intelligence: An Agenda* (cap. 1). University of Chicago Press. https://www.nber.org/chapters/c14007
+
+Bureau van Dijk (2025). *SABI: Sistema de Análisis de Balances Ibéricos* [Base de datos]. Moody's Analytics.
+
+Eurostat (2025, 23 de enero). *Usage of AI technologies increasing in EU enterprises*. Eurostat News. https://ec.europa.eu/eurostat/web/products-eurostat-news/w/ddn-20250123-3
+
+Instituto Nacional de Estadística (2025). *Encuesta sobre el uso de Tecnologías de la Información y las Comunicaciones (TIC) y del comercio electrónico en las empresas. Año 2024 - Primer trimestre de 2025* [Nota de prensa]. https://ine.es/dyngs/Prensa/ETICCE20241T2025.pdf
+
+Rathod, S., Kumar, A. T., & Haripriya, S. (2023). Data Manipulation using R Tidyverse. Statistical Procedures for Analyzing Agricultural Data using, 2023, 17.. 
+
+Wickham, H., Bryan, J., Kalicinski, M., Valery, K., Leitienne, C., Colbert, B., ... & Bryan, M. J. (2019). Package ‘readxl’. Version, 13(1).
+
+Xie, Y. (2018). knitr: A comprehensive tool for reproducible research in R. In Implementing reproducible research (pp. 3-31). Chapman and Hall/CRC.
+
+Androwski, R., Popovitchenko, T., Smart, J., Ogino, S., Wang, G., Saba, M., ... & Roy, J. (2025). Analysis of Categorical Data.
